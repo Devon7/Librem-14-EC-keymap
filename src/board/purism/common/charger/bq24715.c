@@ -26,7 +26,8 @@ int battery_charger_disable(void) {
     res = smbus_write(
         CHARGER_ADDRESS,
         0x12,
-        SBC_CHARGE_INHIBIT | SBC_LDO_MODE_EN | SBC_LSFET_OCP_THR | SBC_PWM_FREQ_1MHZ | SBC_WDTMR_ADJ_175S | SBC_IDPM_EN
+        SBC_CHARGE_INHIBIT | SBC_LDO_MODE_EN | SBC_LSFET_OCP_THR | SBC_PWM_FREQ_800KHZ | SBC_WDTMR_ADJ_175S
+//        SBC_EN_LWPWR | SBC_CHARGE_INHIBIT | SBC_LDO_MODE_EN | SBC_LSFET_OCP_THR | SBC_PWM_FREQ_1MHZ | SBC_WDTMR_ADJ_175S | SBC_IDPM_EN
     );
     DEBUG("CHG disabled\n");
 
@@ -44,7 +45,7 @@ int battery_charger_set_charge_current(int current)
     if (current == last_current)
         return 0;
 
-    if (smbus_write(CHARGER_ADDRESS, 0x14, current) < 0)
+    if (smbus_write(CHARGER_ADDRESS, 0x14, current & 0x1FC0) < 0)
         return -1;
     else {
         last_current = current;
@@ -76,23 +77,23 @@ int battery_charger_enable(void) {
         return res;
 
     // Set minimum system voltage
-    res = smbus_write(CHARGER_ADDRESS, 0x3E, charger_min_system_voltage);
+    res = smbus_write(CHARGER_ADDRESS, 0x3E, charger_min_system_voltage & 0x3F00);
     if (res < 0)
         return res;
 
     // Set input current in mA
-    res = smbus_write(CHARGER_ADDRESS, 0x3F, charger_input_current);
+    res = smbus_write(CHARGER_ADDRESS, 0x3F, charger_input_current & 0x1FC0);
     if (res < 0)
         return res;
 
     // Set charge voltage in mV,
     // must be set before charge current
-    res = smbus_write(CHARGER_ADDRESS, 0x15, battery_charge_voltage);
+    res = smbus_write(CHARGER_ADDRESS, 0x15, battery_charge_voltage & 0x7FF0);
     if (res < 0)
         return res;
 
     // Set charge current in mA
-    res = battery_charger_set_charge_current(battery_charge_current);
+    res = battery_charger_set_charge_current(battery_charge_current & 0x1FC0);
     if (res < 0)
         return res;
 
@@ -100,11 +101,12 @@ int battery_charger_enable(void) {
     res = smbus_write(
         CHARGER_ADDRESS,
         0x12,
-        SBC_PWM_FREQ_1MHZ |
-        SBC_IDPM_EN |
+        SBC_PWM_FREQ_800KHZ |
+        /*SBC_IDPM_EN |*/
+        SBC_LDO_MODE_EN |
         SBC_FIX_IOUT |
-        SBC_AUDIO_FREQ_LIM |
-        SBC_LSFET_OCP_THR
+        SBC_AUDIO_FREQ_LIM /*|
+        SBC_LSFET_OCP_THR */
     );
 
     DEBUG("CHG enabled\n");
