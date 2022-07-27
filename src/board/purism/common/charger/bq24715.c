@@ -42,13 +42,22 @@ int battery_charger_disable(void) {
 
 int battery_charger_set_charge_current(int current)
 {
+    int res;
+
     // Set charge current in mA,
     if (current == last_current)
         return 0;
 
-    if (smbus_write(CHARGER_ADDRESS, 0x14, current & 0x1FC0) < 0)
-        return -1;
-    else {
+    // Set charge voltage in mV,
+    // must be set before charge current
+    res = smbus_write(CHARGER_ADDRESS, 0x15, battery_charge_voltage & 0x7FF0);
+    if (res < 0)
+        return res;
+
+    res = smbus_write(CHARGER_ADDRESS, 0x14, current & 0x1FC0);
+    if (res < 0) {
+        return res;
+    } else {
         last_current = current;
         return 0;
     }
@@ -85,12 +94,6 @@ int battery_charger_enable(void) {
 
     // Set input current in mA
     res = smbus_write(CHARGER_ADDRESS, 0x3F, charger_input_current & 0x1FC0);
-    if (res < 0)
-        return res;
-
-    // Set charge voltage in mV,
-    // must be set before charge current
-    res = smbus_write(CHARGER_ADDRESS, 0x15, battery_charge_voltage & 0x7FF0);
     if (res < 0)
         return res;
 
