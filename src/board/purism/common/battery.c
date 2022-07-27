@@ -100,8 +100,11 @@ static int battery_charger_configure(void) {
         else
             battery_charge_current = (battery_charge_max_current / 8);
 
-        peci_update_PL4(POWER_LIMIT_DC);
-
+        DEBUG("chg enable, set PL4=%d", POWER_LIMIT_DC);
+        if (peci_update_PL4(POWER_LIMIT_DC) < 0)
+            DEBUG(" failed\n");
+        else
+            DEBUG(" OK\n");
         return battery_charger_enable();
     } else {
         // set appropriate LED state
@@ -114,7 +117,11 @@ static int battery_charger_configure(void) {
             // if charger is still present and we have been charging,
             // switch back to AC CPU limits
             if (should_charge && charger_present) {
-                peci_update_PL4(POWER_LIMIT_AC);
+                DEBUG("chg disable, set PL4=%d", POWER_LIMIT_AC);
+                if (peci_update_PL4(POWER_LIMIT_AC) < 0)
+                    DEBUG(" failed\n");
+                else
+                    DEBUG(" OK\n");
             }
             // charging has been stopped or interrupted -> clear flag
             should_charge = false;
