@@ -84,6 +84,11 @@ static int battery_charger_configure(void) {
             power_state == POWER_STATE_S0) {
             gpio_set(&LED_PWR, true);
             gpio_set(&LED_BAT_WARN, true);
+            DEBUG("chg enable, set PL4=%d", POWER_LIMIT_DC);
+            if (peci_update_PL4(POWER_LIMIT_DC) < 0)
+                DEBUG(" failed\n");
+            else
+                DEBUG(" OK\n");
         }
         if (battery_charge < 10)
             battery_charge_current = (battery_charge_max_current / 8);
@@ -100,11 +105,6 @@ static int battery_charger_configure(void) {
         else
             battery_charge_current = (battery_charge_max_current / 8);
 
-        DEBUG("chg enable, set PL4=%d", POWER_LIMIT_DC);
-        if (peci_update_PL4(POWER_LIMIT_DC) < 0)
-            DEBUG(" failed\n");
-        else
-            DEBUG(" OK\n");
         return battery_charger_enable();
     } else {
         // set appropriate LED state
