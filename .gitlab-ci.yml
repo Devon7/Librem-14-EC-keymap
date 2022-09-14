@@ -25,8 +25,10 @@ build:
     when: on_success
     name: "L14-EC-${CI_COMMIT_REF_NAME}-${CI_JOB_NAME}"
     paths:
-      - "${CI_PROJECT_DIR}/Librem_14_EC/ec*.rom"
+      - "Librem_14_EC/ec*.rom"
 
 trigger:
   stage: trigger
   trigger: Purism/librem14_ec_flash
+  variables:
+    LIBREMEC_PIPELINE_ID: $CI_PIPELINE_ID
