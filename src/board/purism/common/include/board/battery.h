@@ -69,6 +69,7 @@ void battery_reset(void);
 int battery_charger_disable(void);
 int battery_charger_set_charge_current(int current);
 int battery_charger_enable(void);
+bool battery_charger_is_enabled(void);
 void battery_charger_event(void);
 void battery_charger_debug(void);
 

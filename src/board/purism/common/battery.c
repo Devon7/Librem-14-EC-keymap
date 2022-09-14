@@ -82,13 +82,9 @@ static int battery_charger_configure(void) {
         if (power_state == POWER_STATE_DS3 ||
             power_state == POWER_STATE_S3 ||
             power_state == POWER_STATE_S0) {
+
             gpio_set(&LED_PWR, true);
             gpio_set(&LED_BAT_WARN, true);
-            DEBUG("chg enable, set PL4=%d", POWER_LIMIT_DC);
-            if (peci_update_PL4(POWER_LIMIT_DC) < 0)
-                DEBUG(" failed\n");
-            else
-                DEBUG(" OK\n");
         }
         if (battery_charge < 10)
             battery_charge_current = (battery_charge_max_current / 8);
@@ -105,28 +101,21 @@ static int battery_charger_configure(void) {
         else
             battery_charge_current = (battery_charge_max_current / 8);
 
-        return battery_charger_enable();
+        battery_charger_enable();
+        return 0;
     } else {
         // set appropriate LED state
         gpio_set(&LED_BAT_CHG, true);
+
+        battery_charger_disable();
+
         if (power_state == POWER_STATE_DS3 ||
             power_state == POWER_STATE_S3 ||
             power_state == POWER_STATE_S0) {
 
-            battery_charger_disable();
-            // if charger is still present and we have been charging,
-            // switch back to AC CPU limits
-            if (should_charge && charger_present) {
-                DEBUG("chg disable, set PL4=%d", POWER_LIMIT_AC);
-                if (peci_update_PL4(POWER_LIMIT_AC) < 0)
-                    DEBUG(" failed\n");
-                else
-                    DEBUG(" OK\n");
-            }
-            // charging has been stopped or interrupted -> clear flag
-            should_charge = false;
             // BATTERY_TERMINATE_DISCHARGE_ALARM gets set at ~10%
             // BATTERY_REMAINING_CAPACITY_ALARM gets set < 10%
+            // BATTERY_FULLY_DISCHARGED gets set <= 7%
             if ((battery_charge < 20) || (battery_status & BATTERY_TERMINATE_DISCHARGE_ALARM)) {
                 if ((battery_charge < 10) || (battery_status & BATTERY_REMAINING_CAPACITY_ALARM)) {
                     gpio_set(&LED_BAT_WARN, !gpio_get(&LED_BAT_WARN));
@@ -139,6 +128,10 @@ static int battery_charger_configure(void) {
                 gpio_set(&LED_BAT_WARN, true);
             }
         }
+        // charging has been stopped or interrupted (e.g. charger removed) -> clear flag
+        should_charge = false;
+        //charging = false;
+
         return 0;
     }
 }
