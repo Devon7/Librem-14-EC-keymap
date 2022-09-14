@@ -29,6 +29,8 @@ build:
 
 trigger:
   stage: trigger
-  trigger: Purism/librem14_ec_flash
+  trigger:
+    project: Purism/librem14_ec_flash
+    branch: fix-iso-pipeline
   variables:
     LIBREMEC_PIPELINE_ID: $CI_PIPELINE_ID
