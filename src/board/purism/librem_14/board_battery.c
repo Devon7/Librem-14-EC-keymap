@@ -162,6 +162,40 @@ uint16_t adcval;
     return battery_current;
 }
 
+// this should return the total currently consumed power
+uint16_t board_get_current(void)
+{
+uint8_t to=0;
+uint16_t adcval;
+
+    if (!gpio_get(&ACIN_N)) { // running from charger
+        // we may have to wait for ADC to finish
+        while (to++ < 100 && !(VCH1CTL & (1L << 7)))
+            delay_us(100);
+
+        if (!(VCH1CTL & (1L << 7)))
+            DEBUG("CUR !adc sts=0x%02x ctl=0x%02x\n", ADCSTS, VCH1CTL);
+
+        adcval = (((uint16_t)VCH1DATM & 0x03) << 8) | VCH1DATL;
+
+        DEBUG("cur raw: %d (0x%02x 0x%02x) ", adcval, VCH1DATM, VCH1DATL);
+
+        // clear ADC to start new cycle
+        VCH1CTL |= (1L << 7);
+
+        adcval = adcval * (30000 / 0x3ff); // = sense voltage (3V ADC ref)
+        adcval = adcval / (4);		   // primary current from charger
+
+        //if (battery_current < 0)
+        //    adcval += -battery_current;
+
+        DEBUG("sys %dmA\n", adcval);
+        return adcval;
+    } else {
+        return battery_current;
+    }
+}
+
 
 static bool read_eeprom(void)
 {
@@ -426,13 +460,6 @@ int16_t tval;
     if (tval >= 0) {
         // the SBS reports the max charge current,
         // normal charge current is about 50% of that
-#if 0
-        if (battery_charge_current > 1500) {
-            battery_charge_current /= 2;
-        } else {
-            battery_charge_current = 1000; // safe standard charge for all bats
-        }
-#else
         if (battery_charge_max_current < 100) {
             // something went wrong reading the charge current
             if (battery_charge_voltage != 0) {
@@ -453,7 +480,6 @@ int16_t tval;
         // 50% of max. current is a good start,
         // it will get fine tuned in common/battery.c
         battery_charge_current = battery_charge_max_current / 2;
-#endif
     }
 
     return true;
@@ -470,6 +496,7 @@ void board_battery_update_state(void)
             battery_charge = board_battery_get_charge();
         }
     }
+    board_get_current();
 }
 
 void board_battery_print_batinfo(void)
