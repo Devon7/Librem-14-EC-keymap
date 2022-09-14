@@ -33,4 +33,6 @@ trigger:
     project: Purism/librem14_ec_flash
     branch: fix-iso-pipeline
   variables:
+    LIBREMEC_PROJECT_PATH: $CI_PROJECT_PATH
     LIBREMEC_PIPELINE_ID: $CI_PIPELINE_ID
+    LIBREMEC_COMMIT_REF_NAME: $CI_COMMIT_REF_NAME
