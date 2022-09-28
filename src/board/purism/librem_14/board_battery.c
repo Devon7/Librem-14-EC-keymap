@@ -162,6 +162,40 @@ uint16_t adcval;
     return battery_current;
 }
 
+// this should return the total currently consumed power
+uint16_t board_get_current(void)
+{
+uint8_t to=0;
+uint16_t adcval;
+
+    if (!gpio_get(&ACIN_N)) { // running from charger
+        // we may have to wait for ADC to finish
+        while (to++ < 100 && !(VCH1CTL & (1L << 7)))
+            delay_us(100);
+
+        if (!(VCH1CTL & (1L << 7)))
+            DEBUG("CUR !adc sts=0x%02x ctl=0x%02x\n", ADCSTS, VCH1CTL);
+
+        adcval = (((uint16_t)VCH1DATM & 0x03) << 8) | VCH1DATL;
+
+        DEBUG("cur raw: %d (0x%02x 0x%02x) ", adcval, VCH1DATM, VCH1DATL);
+
+        // clear ADC to start new cycle
+        VCH1CTL |= (1L << 7);
+
+        adcval = adcval * (30000 / 0x3ff); // = sense voltage (3V ADC ref)
+        adcval = adcval / (4);		   // primary current from charger
+
+        //if (battery_current < 0)
+        //    adcval += -battery_current;
+
+        DEBUG("sys %dmA\n", adcval);
+        return adcval;
+    } else {
+        return battery_current;
+    }
+}
+
 
 static bool read_eeprom(void)
 {
@@ -358,12 +392,25 @@ int16_t tval;
 
     DEBUG("bat probe - ");
 
-    res = i2c_get_safe(0x00, &tval, 2, 0xffff, 0x7fff, 3);
+    res = i2c_get_safe(0x03, &tval, 2, 0xffff, 0x7fff, 3);
     if (res < 0) {
         DEBUG("bat gauge r=%d\n", res);
         return false;
-    } else
+    } else {
         DEBUG("is SBS\n");
+        if (tval & 0x0001)
+            DEBUG("  has internal chg-ctl sup\n");
+        if (tval & 0x0100)
+            DEBUG("  internal chg-ctl en\n");
+        if (tval & 0x0002)
+            DEBUG("  primary bat sup\n");
+        if (tval & 0x0200)
+            DEBUG("  bat is primary\n");
+        if (tval & 0x0080)
+            DEBUG("  cond req\n");
+        else
+            DEBUG("  bat OK\n");
+    }
 
     res = i2c_get_safe(0x18, &tval, 2, 0x0000, 0x7fff, 3);
     if (res < 0) {
@@ -396,28 +443,43 @@ int16_t tval;
         DEBUG(" serial#: %d\n", tval);
     }
 
-    res = i2c_get_safe(0x14, &tval, 2, 1000, 5000, 3);
-    if (res < 0) {
-        DEBUG(" 0x14 r=%d\n", res);
-    } else {
-        battery_charge_current = tval;
-    };
-
-    if (battery_charge_current > 0) {
-        // the SBS reports the max charge current,
-        // normal charge current is about 50% of that
-        if (battery_charge_current > 1500) {
-            battery_charge_current /= 2;
-        } else {
-            battery_charge_current = 1000; // safe standard charge for all bats
-        }
-    }
-
     res = i2c_get_safe(0x15, &tval, 2, 7000, 14000, 3);
     if (res < 0) {
         DEBUG(" 0x15 r=%d\n", res);
     } else {
         battery_charge_voltage = tval;
+    }
+
+    res = i2c_get_safe(0x14, &tval, 2, 1000, 5000, 3);
+    if (res < 0) {
+        DEBUG(" 0x14 r=%d\n", res);
+    } else {
+        battery_charge_max_current = tval;
+    };
+
+    if (tval >= 0) {
+        // the SBS reports the max charge current,
+        // normal charge current is about 50% of that
+        if (battery_charge_max_current < 100) {
+            // something went wrong reading the charge current
+            if (battery_charge_voltage != 0) {
+                // 3-cell
+                if ((battery_charge_voltage > 11000) && (battery_charge_voltage < 14000)) {
+                    battery_charge_max_current = 3000;
+                }
+                // 4-cell
+                if ((battery_charge_voltage > 7000) && (battery_charge_voltage < 9000)) {
+                    battery_charge_max_current = 4000;
+                }
+            } else {
+                DEBUG("no valid charge voltage, must disable charger\n");
+
+                return false;
+            }
+        }
+        // 50% of max. current is a good start,
+        // it will get fine tuned in common/battery.c
+        battery_charge_current = battery_charge_max_current / 2;
     }
 
     return true;
@@ -434,22 +496,24 @@ void board_battery_update_state(void)
             battery_charge = board_battery_get_charge();
         }
     }
+    board_get_current();
 }
 
 void board_battery_print_batinfo(void)
 {
-   DEBUG(" man date: 0x%04x\n", battery_manufacturing_date);
-   DEBUG(" cycle#: %d\n", battery_cycle_count);
-   DEBUG(" voltage : %d mV\n", battery_voltage);
-   DEBUG(" temp    : %d.%d °C\n", (battery_temp/10), (battery_temp%10));
-   DEBUG(" current : %d mA\n", battery_current);
-   DEBUG(" charge  : %d%%\n", battery_charge);
-   DEBUG(" rem cap : %d mAh\n", battery_remaining_capacity);
-   DEBUG(" full cap: %d mAh\n", battery_full_capacity);
-   DEBUG(" chg volt: %d mV\n", battery_charge_voltage);
-   DEBUG(" chg cur : %d mA\n", battery_charge_current);
-   DEBUG(" des-volt: %d mV\n", battery_design_voltage);
-   DEBUG(" des-cap : %d mAh\n", battery_design_capacity);
+   DEBUG(" man date    : 0x%04x\n", battery_manufacturing_date);
+   DEBUG(" cycle#      : %d\n", battery_cycle_count);
+   DEBUG(" voltage     : %d mV\n", battery_voltage);
+   DEBUG(" temp        : %d.%d °C\n", (battery_temp/10), (battery_temp%10));
+   DEBUG(" current     : %d mA\n", battery_current);
+   DEBUG(" charge      : %d%%\n", battery_charge);
+   DEBUG(" rem cap     : %d mAh\n", battery_remaining_capacity);
+   DEBUG(" full cap    : %d mAh\n", battery_full_capacity);
+   DEBUG(" chg volt    : %d mV\n", battery_charge_voltage);
+   DEBUG(" chg max cur : %d mA\n", battery_charge_max_current);
+   DEBUG(" chg cur     : %d mA\n", battery_charge_current);
+   DEBUG(" des-volt    : %d mV\n", battery_design_voltage);
+   DEBUG(" des-cap     : %d mAh\n", battery_design_capacity);
 }
 
 // try to figure out which battery we have

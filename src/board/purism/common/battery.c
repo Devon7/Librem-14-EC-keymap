@@ -6,6 +6,7 @@
 #include <board/gpio.h>
 #include <board/board.h>
 #include <board/power.h>
+#include <board/peci.h>
 #include <common/debug.h>
 #include <ec/adc.h>
 
@@ -81,30 +82,61 @@ static int battery_charger_configure(void) {
         if (power_state == POWER_STATE_DS3 ||
             power_state == POWER_STATE_S3 ||
             power_state == POWER_STATE_S0) {
+
             gpio_set(&LED_PWR, true);
             gpio_set(&LED_BAT_WARN, true);
         }
-        return battery_charger_enable();
+        if (battery_charge < 10)
+            battery_charge_current = (battery_charge_max_current / 8);
+        else if (battery_charge < 20)
+            battery_charge_current = (battery_charge_max_current / 6);
+        else if (battery_charge < 40)
+            battery_charge_current = (battery_charge_max_current / 4);
+        else if (battery_charge < 80)
+            battery_charge_current = (battery_charge_max_current / 2);
+        else if (battery_charge < 90)
+            battery_charge_current = (battery_charge_max_current / 4);
+        else if (battery_charge < 95)
+            battery_charge_current = (battery_charge_max_current / 6);
+        else
+            battery_charge_current = (battery_charge_max_current / 8);
+
+        battery_charger_enable();
+        return 0;
     } else {
-        // charging has been stopped or interrupted -> clear flag
-        should_charge = false;
         // set appropriate LED state
         gpio_set(&LED_BAT_CHG, true);
+
+        battery_charger_disable();
+
         if (power_state == POWER_STATE_DS3 ||
             power_state == POWER_STATE_S3 ||
             power_state == POWER_STATE_S0) {
-            if ((battery_charge < 20) || (battery_status & BATTERY_TERMINATE_CHARGE_ALARM)) {
-                gpio_set(&LED_BAT_WARN, false);
+
+            // BATTERY_TERMINATE_DISCHARGE_ALARM gets set at ~10%
+            // BATTERY_REMAINING_CAPACITY_ALARM gets set < 10%
+            // BATTERY_FULLY_DISCHARGED gets set <= 7%
+            if ((battery_charge < 20) || (battery_status & BATTERY_TERMINATE_DISCHARGE_ALARM)) {
+                if ((battery_charge < 10) || (battery_status & BATTERY_REMAINING_CAPACITY_ALARM)) {
+                    gpio_set(&LED_BAT_WARN, !gpio_get(&LED_BAT_WARN));
+                } else {
+                    gpio_set(&LED_BAT_WARN, false);
+                }
                 gpio_set(&LED_PWR, true);
             } else {
                 gpio_set(&LED_PWR, false);
                 gpio_set(&LED_BAT_WARN, true);
             }
         }
-        return battery_charger_disable();
+        // charging has been stopped or interrupted (e.g. charger removed) -> clear flag
+        should_charge = false;
+        //charging = false;
+
+        return 0;
     }
 }
 
+// set up defaults
 uint16_t battery_temp = 0;
 uint16_t battery_voltage = 0;
 uint16_t battery_current = 0;
@@ -118,6 +150,7 @@ uint16_t battery_cycle_count = 0;
 uint16_t battery_manufacturing_date = 0;
 uint16_t battery_charge_voltage = 0;
 uint16_t battery_charge_current = 0;
+uint16_t battery_charge_max_current = 0;
 uint16_t battery_min_voltage = 0;
 
 uint16_t charger_input_current = 0x00;
