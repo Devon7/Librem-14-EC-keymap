@@ -283,7 +283,7 @@ void power_off_s5(void) {
     DCR2 = 0x00; // B
     DCR3 = 0x00; // G
     DCR4 = 0x00; // R
-    
+
 #if DEEP_SX
     // TODO
 #else // DEEP_SX
@@ -342,16 +342,6 @@ static void power_peci_limit(void) {
     if (watts == last_watts) {
         return;
     }
-#if 0
-    res = peci_update_PsysPL2(45);
-    if (res < 0) {
-        ERROR("power_peci_limit failed: 0x%02X\n", -res);
-    } else if (res != 0x40) {
-        ERROR("power_peci_limit unknown response: 0x%02X\n", res);
-    } else {
-        DEBUG("PsysPL2 set to %d W\n", 45);
-    }
-#endif
     res = peci_update_PL4(watts);
     if (res < 0) {
         ERROR("power_peci_limit failed: 0x%02X\n", -res);

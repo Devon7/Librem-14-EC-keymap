@@ -130,7 +130,6 @@ static int battery_charger_configure(void) {
         }
         // charging has been stopped or interrupted (e.g. charger removed) -> clear flag
         should_charge = false;
-        //charging = false;
 
         return 0;
     }

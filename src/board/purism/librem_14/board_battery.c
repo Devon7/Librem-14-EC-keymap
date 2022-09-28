@@ -186,9 +186,6 @@ uint16_t adcval;
         adcval = adcval * (30000 / 0x3ff); // = sense voltage (3V ADC ref)
         adcval = adcval / (4);		   // primary current from charger
 
-        //if (battery_current < 0)
-        //    adcval += -battery_current;
-
         DEBUG("sys %dmA\n", adcval);
         return adcval;
     } else {
@@ -308,7 +305,7 @@ int res;
 // min. volt: 9V
 // nominal capacity: 6200mAh
 // standard charge: 0.2C (1240mA)
-// max. charge: 
+// max. charge:
 // standard discharge: 0.5C (3100mA)
 // max. discharge: 1.0C (6200mA)
 //
