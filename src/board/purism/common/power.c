@@ -589,8 +589,21 @@ void power_event(void) {
 #endif // HAVE_SUSWARN_N
     {
         // Disable S5 power plane if not needed
+        static int power_off_s5_time = 0;
+        int now = time_get();
         if (power_state == POWER_STATE_S5) {
-            power_off_s5();
+            if (power_off_s5_time == 0) {
+                power_off_s5_time = now + 7000;
+                DEBUG("Power off to DS5 in 7 sec\n");
+            } else if (now >= power_off_s5_time) {
+                DEBUG("Power off to DS5 now\n");
+                power_off_s5();
+                power_off_s5_time = 0;
+            }
+        } else if (power_off_s5_time != 0) {
+            DEBUG("Cancel power off to DS5 with %d ms to go\n",
+                power_off_s5_time - now);
+            power_off_s5_time = 0;
         }
     }
 
@@ -661,7 +674,7 @@ void power_event(void) {
             last_time = time;
         }
 
-        if (!gpio_get(&ALL_SYS_PWRGD_VRON))
+        if (power_state == POWER_STATE_DS5)
             GPIO_SET_DEBUG(SMC_SHUTDOWN_N, false); // XXX
 #if HAVE_XLP_OUT
         // Power off VDD3 if system should be off
