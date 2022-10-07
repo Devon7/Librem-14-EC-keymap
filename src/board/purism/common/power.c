@@ -588,22 +588,24 @@ void power_event(void) {
     if (ack_new)
 #endif // HAVE_SUSWARN_N
     {
-        // Disable S5 power plane if not needed
-        static int power_off_s5_time = 0;
-        int now = time_get();
+        // Disable S5 power plane if not needed.  If CPU is in S5 for 7 seconds,
+        // it is not restarting.  (During hard reset, the CPU enters S5 briefly
+        // but PCH restarts it after a few seconds, do not cut power then.)
+        static uint16_t power_off_s5_start_time = 0;
+        uint16_t now = time16_get();
         if (power_state == POWER_STATE_S5) {
-            if (power_off_s5_time == 0) {
-                power_off_s5_time = now + 7000;
+            if (power_off_s5_start_time == 0) {
+                power_off_s5_start_time = now ? now : 1;    // In case 'now' is 0
                 DEBUG("Power off to DS5 in 7 sec\n");
-            } else if (now >= power_off_s5_time) {
+            } else if (now - power_off_s5_start_time >= 7000) {
                 DEBUG("Power off to DS5 now\n");
                 power_off_s5();
-                power_off_s5_time = 0;
+                power_off_s5_start_time = 0;
             }
-        } else if (power_off_s5_time != 0) {
-            DEBUG("Cancel power off to DS5 with %d ms to go\n",
-                power_off_s5_time - now);
-            power_off_s5_time = 0;
+        } else if (power_off_s5_start_time != 0) {
+            DEBUG("Cancel power off to DS5 after %d ms\n",
+                now - power_off_s5_start_time);
+            power_off_s5_start_time = 0;
         }
     }
 
