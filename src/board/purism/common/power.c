@@ -332,7 +332,7 @@ static void power_peci_limit(void) {
         else
             watts = POWER_LIMIT_AC;
     } else {
-        if (battery_charge > 40) {
+        if (battery_charge > 20) {
             watts = POWER_LIMIT_DC;
         } else {
             watts = POWER_LIMIT_DC_LOW;

@@ -37,8 +37,8 @@ CFLAGS+=-DBOARD_FAN_POINTS="\
 # Set CPU power limits in watts
 CFLAGS+=\
 	-DPOWER_LIMIT_AC=65 \
-	-DPOWER_LIMIT_DC=45 \
-	-DPOWER_LIMIT_DC_LOW=20
+	-DPOWER_LIMIT_DC=25 \
+	-DPOWER_LIMIT_DC_LOW=10
 
 # Add purism common code
 include src/board/purism/common/common.mk
