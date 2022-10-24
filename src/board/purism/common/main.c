@@ -23,6 +23,7 @@
 #include <board/pwm.h>
 #include <board/smbus.h>
 #include <board/smfi.h>
+#include <board/wdt.h>
 #include <common/debug.h>
 #include <common/macro.h>
 #include <common/version.h>
@@ -68,6 +69,8 @@ void init(void) {
     pwm_init();
     smbus_init();
     smfi_init();
+    wdt_init(WDT_TMO_26B);
+    wdt_enable();
 
     //TODO: INTC
 
@@ -135,5 +138,7 @@ void main(void) {
         smfi_event();
         // Idle until next timer interrupt
         //Disabled until interrupts used: PCON |= 1;
+
+        wdt_trigger();
     }
 }
