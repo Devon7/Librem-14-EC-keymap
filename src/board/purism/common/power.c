@@ -570,7 +570,10 @@ void power_event(void) {
 #endif // HAVE_SLP_SUS_N
 
 #if EC_ESPI
-    if (vw_get(&VW_SUS_PWRDN_ACK) == VWS_HIGH)
+    // Disable S5 power plane if not needed
+    if (vw_get(&VW_SUS_PWRDN_ACK) == VWS_HIGH && power_state == POWER_STATE_S5) {
+        power_off_s5();
+    }
 #elif HAVE_SUSWARN_N
     // EC must keep VccPRIM powered if SUSPWRDNACK is de-asserted low or system
     // state is S3
@@ -585,14 +588,31 @@ void power_event(void) {
     #endif
     ack_last = ack_new;
 
-    if (ack_new)
-#endif // HAVE_SUSWARN_N
-    {
-        // Disable S5 power plane if not needed
-        if (power_state == POWER_STATE_S5) {
-            power_off_s5();
-        }
+    // Disable S5 power plane if not needed
+    if (ack_new && power_state == POWER_STATE_S5) {
+        power_off_s5();
     }
+#else
+    // Disable S5 power plane if not needed.  If CPU is in S5 for 7 seconds,
+    // it is not restarting.  (During hard reset, the CPU enters S5 briefly
+    // but PCH restarts it after a few seconds, do not cut power then.)
+    static uint16_t power_off_s5_start_time = 0;
+    uint16_t now = time16_get();
+    if (power_state == POWER_STATE_S5) {
+        if (power_off_s5_start_time == 0) {
+            power_off_s5_start_time = now ? now : 1;    // In case 'now' is 0
+            DEBUG("Power off to DS5 in 7 sec\n");
+        } else if (now - power_off_s5_start_time >= 7000) {
+            DEBUG("Power off to DS5 now\n");
+            power_off_s5();
+            power_off_s5_start_time = 0;
+        }
+    } else if (power_off_s5_start_time != 0) {
+        DEBUG("Cancel power off to DS5 after %d ms\n",
+            now - power_off_s5_start_time);
+        power_off_s5_start_time = 0;
+    }
+#endif
 
 #if HAVE_LAN_WAKEUP_N
     static bool wake_last = true;
@@ -661,7 +681,7 @@ void power_event(void) {
             last_time = time;
         }
 
-        if (!gpio_get(&ALL_SYS_PWRGD_VRON))
+        if (power_state == POWER_STATE_DS5)
             GPIO_SET_DEBUG(SMC_SHUTDOWN_N, false); // XXX
 #if HAVE_XLP_OUT
         // Power off VDD3 if system should be off
