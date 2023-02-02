@@ -325,6 +325,16 @@ static void power_peci_limit(void) {
     static uint8_t last_watts = 0;
     int res;
 
+    // If not in S0, forget last_watts, because the SoC
+    // does not retain PL4 in any sleep state.
+    if (power_state != POWER_STATE_S0) {
+        if (last_watts) {
+            DEBUG("Not in S0, forget last PL4 of %d W\n", last_watts);
+            last_watts = 0;
+        }
+        return;
+    }
+
     ac = !gpio_get(&ACIN_N);
     if (ac) {
         if (battery_charger_is_enabled())
@@ -350,13 +360,6 @@ static void power_peci_limit(void) {
     } else {
         last_watts = watts;
         DEBUG("PL4 set to %d W\n", watts);
-    }
-}
-
-// Set the power draw limit depending on if on AC or DC power
-void power_set_limit(void) {
-    if (power_state == POWER_STATE_S0) {
-        power_peci_limit();
     }
 }
 
@@ -406,7 +409,7 @@ void power_event(void) {
         // Send SCI to update AC and battery information
         ac_send_sci = true;
 
-        power_set_limit();
+        power_peci_limit();
     }
     if (ac_send_sci) {
         // Send SCI 0x16 for AC detect event if ACPI OS is loaded
@@ -511,7 +514,7 @@ void power_event(void) {
 
         // Set PL4 as soon as possible after transitioning to S0
         delay_ms(200);
-        power_set_limit();
+        power_peci_limit();
     } else if(!pg_new && pg_last) {
         DEBUG("%02X: ALL_SYS_PWRGD de-asserted\n", main_cycle);
 
@@ -635,6 +638,7 @@ void power_event(void) {
     static uint32_t last_time = 0;
     static bool dimdir=true;
     uint32_t time = time_get();
+    power_peci_limit();
     if (power_state == POWER_STATE_S0) {
 #if EC_ESPI
         if (!gpio_get(&CPU_C10_GATE_N)) {
@@ -659,7 +663,6 @@ void power_event(void) {
             DCR5 = 0xff;
             //gpio_set(&LED_ACIN, false);
         }
-        power_set_limit();
     } else if (power_state == POWER_STATE_S3 || power_state == POWER_STATE_DS3) {
         // Suspended, flashing green light
         DCR5 += dimdir ? 1 : -1;

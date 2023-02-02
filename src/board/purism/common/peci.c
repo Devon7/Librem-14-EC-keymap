@@ -195,8 +195,10 @@ int peci_update_PL4(int watt)
         int rv;
         uint32_t data;
 
-        if (power_state != POWER_STATE_S0)
-                return -1;
+        if (power_state != POWER_STATE_S0) {
+            ERROR("Can't set PL4 to %d W when not in S0\n", watt);
+            return -1;
+        }
 
         data = PECI_PL4_POWER_LIMIT(watt);
 
