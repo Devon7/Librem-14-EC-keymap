@@ -320,27 +320,38 @@ void power_off_s5(void) {
 }
 
 static void power_peci_limit(void) {
-    bool ac = !gpio_get(&ACIN_N);
-    uint8_t watts = ac ? POWER_LIMIT_AC : POWER_LIMIT_DC;
-    if (!ac && battery_charge <= 20)
-        watts = POWER_LIMIT_DC_LOW;
-    // Retry, timeout errors happen occasionally
-    for (int i = 0; i < 16; i++) {
-        // Set PL4 using PECI
-        int res = peci_wr_pkg_config(60, 0, ((uint32_t)watts) * 8);
-        if (res == 0x40) {
-            DEBUG("PL4 set to %d W\n", watts);
-            break;
-        } else if (res < 0) {
-            if (i > 5) {
-                ERROR("power_peci_limit failed: 0x%02X\n", -res);
-            }
+    bool ac;
+    uint8_t watts;
+    static uint8_t last_watts = 0;
+    int res;
+
+    ac = !gpio_get(&ACIN_N);
+    if (ac) {
+        if (battery_charger_is_enabled())
+            watts = POWER_LIMIT_DC;
+        else
+            watts = POWER_LIMIT_AC;
+    } else {
+        if (battery_charge > 20) {
+            watts = POWER_LIMIT_DC;
         } else {
-            ERROR("power_peci_limit unknown response: 0x%02X\n", res);
+            watts = POWER_LIMIT_DC_LOW;
         }
     }
-}
 
+    if (watts == last_watts) {
+        return;
+    }
+    res = peci_update_PL4(watts);
+    if (res < 0) {
+        ERROR("power_peci_limit failed: 0x%02X\n", -res);
+    } else if (res != 0x40) {
+        ERROR("power_peci_limit unknown response: 0x%02X\n", res);
+    } else {
+        last_watts = watts;
+        DEBUG("PL4 set to %d W\n", watts);
+    }
+}
 
 // Set the power draw limit depending on if on AC or DC power
 void power_set_limit(void) {
