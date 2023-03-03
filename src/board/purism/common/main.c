@@ -11,6 +11,7 @@
 #include <board/ecpm.h>
 #include <board/gpio.h>
 #include <board/gctrl.h>
+#include <board/jack_detect.h>
 #include <board/kbc.h>
 #include <board/kbled.h>
 #include <board/kbscan.h>
@@ -123,6 +124,10 @@ void main(void) {
                 // Updates battery status
                 battery_event();
 
+#if defined(HAVE_JACK_DETECT)
+                jack_detect_1s_event();
+#endif
+
                 board_1s_event();
             }
         }
@@ -136,6 +141,12 @@ void main(void) {
         pmc_event(&PMC_1);
         // AP/EC communication over SMFI
         smfi_event();
+
+#if defined(HAVE_JACK_DETECT)
+        // Jack detect fast event
+        jack_detect_event();
+#endif
+
         // Idle until next timer interrupt
         //Disabled until interrupts used: PCON |= 1;
 

@@ -67,7 +67,6 @@ extern struct Gpio __code KBD_BACKLIGHT_EN;
 extern struct Gpio __code SMC_SHUTDOWN_N;
 extern struct Gpio __code CHG_CELL_CFG;
 extern struct Gpio __code BAT_CELL_SEL;
-extern struct Gpio __code HEADPHONE_DET;
 extern struct Gpio __code MIC_SELECT;
 extern struct Gpio __code EC_MUTE_N;
 

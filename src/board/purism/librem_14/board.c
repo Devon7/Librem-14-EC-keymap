@@ -77,6 +77,7 @@ void board_init(void) {
     adc_init();
     VCH0CTL = (1 << 0);	// VCH0 = ADC input 1 on GPI1, clear all else, bat voltage
     VCH1CTL = 0x00;	// VCH1 = ADC input 0 on GPI0, clear all else, charge/discharge currrent
+    VCH2CTL = 0x06; // VCH2 = ADC input 6 on GPI6, no interrupt, headphone jack detect
     adc_enable(true); // we need ADC channel 1 to read bat voltage
 
     // I2C3 enable
@@ -128,34 +129,44 @@ void board_event(void) {
     }
 }
 
-// check headphone jack plug state, set GPIO direction
-static void check_jack_state(void) {
-    static bool hp_det=false;
+bool board_jack_detect_sense(bool last_sense)
+{
+    // The new measurement is normally ready by now.  If it is not, we will
+    // fall back to the last measured state and check again next time.
+    bool result = last_sense;
 
-    if (power_state == POWER_STATE_S0) {
-        bool hp_det_curr = !gpio_get(&HEADPHONE_DET);
-        if (hp_det != hp_det_curr) {
-            hp_det = hp_det_curr;
-            if (hp_det) {
-                DEBUG("Jack detect: plug inserted\n");
-                // there is a pull up so setting it as input will pull it high too
-                *(MIC_SELECT.control) = GPIO_IN;
-            } else {
-                DEBUG("Jack detect: plug removed\n");
-                // pin state is false by GPIO init, so just reenable output to pull it low
-                *(MIC_SELECT.control) = GPIO_OUT;
-            }
-        }
-    } else {
-        // default to unplugged when not in S0
-        *(MIC_SELECT.control) = GPIO_OUT;
+    if(VCH2CTL & (1<<7)) {
+        // Measurement is ready
+        uint16_t hp_jack_measurement = VCH2DATM;
+        hp_jack_measurement <<= 8;
+        hp_jack_measurement |= VCH2DATL;
+
+        // No jack (open circuit) is 3 V.  A plugged jack is around 0.8 V, but
+        // it varies because the sense pin on the NJP402 headphone jack (pin 4)
+        // shorts to the left channel (not ground).  (This is the plug tip, the
+        // last pin to make and the first to break.)
+        //
+        // Use a threshold of ~2.5 V to decide whether the jack is plugged.
+        result = hp_jack_measurement <= 850;
+
+        // Start another measurement, write 1 to the status bit to clear it.
+        VCH2CTL |= (1<<7);
     }
+
+    return result;
+}
+
+void board_jack_detect_activate(void)
+{
+    // Start a new measurement, so at the next sense we do not use a stale
+    // measurement that has been sitting around since the jack detect was last
+    // enabled.  It's OK if a measurement is already ongoing and this has no
+    // effect, because that measurement is recent.
+    VCH2CTL |= (1<<7);
 }
 
 // called once per second
 void board_1s_event(void) {
-    check_jack_state();
-
     // if battery voltage drops below min voltage we prepare to shut down
     // hard once external power is removed to prevent main battery from
     // deep discharge
