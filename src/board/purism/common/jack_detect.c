@@ -34,7 +34,7 @@ static void set_jack_detect(bool state)
         // with the second digital microphone's data line (DMIC_DATA1), and this
         // seems to cause the codec to switch the pad mux.
         GPOTF &= ~1;    // push-pull, go high briefly
-        delay_ms(100);
+        delay_ms(10);
         // We don't want to stay pushing high forever.  If the S3 plane powers
         // off while pushing high (which can happen suddenly), we'll be
         // backfeeding another rail and that rail will go into a safety shutoff
