@@ -25,6 +25,21 @@ pause () {
 	read -r _
 }
 
+# API key to access the repo
+if [[ ! -f .release-api-key ]]; then
+    echo "Api key not found. Configure and save an api key to .release-api-key"
+    exit 1
+fi
+
+APIKEY="$(cat .release-api-key)"
+
+if [[ -z "$APIKEY" ]]; then
+    echo "Api key not found. Configure and save an api key to .release-api-key"
+    exit 1
+fi
+
+
+
 # boards to build
 boards=("librem_14")
 
@@ -46,6 +61,39 @@ if [ -z "$(git tag -l "$TAG" --points-at HEAD)" ]; then
 	echo "Reset tag to HEAD and try again" >&2
 	exit 1
 fi
+
+ROM_REPO_ID=2649
+TAG_COMMIT=$(git rev-list -n 1 $TAG)
+ROM_JOB=$(curl -s --header "PRIVATE-TOKEN: $(cat .release-api-key)" "https://source.puri.sm/api/v4/projects/$ROM_REPO_ID/jobs" | jq ".[] | select(.tag == true) | select(.ref == \"$TAG\")" | jq -s '.[0]')
+ROM_JOB_COMMIT=$(echo $ROM_JOB | jq -r ".commit.id")
+ROM_PIPELINE_ID=$(echo $ROM_JOB | jq -r ".pipeline.id")
+
+if [[ "$ROM_JOB_COMMIT" != "$TAG_COMMIT" ]]; then
+    echo "Latest tag job commit doesn't match commit pointed by tag."
+    echo "Job commit: $ROM_JOB_COMMIT"
+    echo "Tag commit: $TAG_COMMIT"
+    exit 1
+fi
+
+ISO_REPO_ID=3038
+ISO_JOB_LIST=$(curl -s --header "PRIVATE-TOKEN: $(cat .release-api-key)" "https://source.puri.sm/api/v4/projects/$ISO_REPO_ID/jobs" | jq -ac '.[] | {id:.id, pipeline:{id:.pipeline.id}}')
+ISO_JOB_ID="" # 
+for JOB in $ISO_JOB_LIST
+do
+    ID=$(echo $JOB | jq -r '.pipeline.id')
+    LIBREMEC_PIPELINE_ID=$(curl -s --header "PRIVATE-TOKEN: $(cat .release-api-key)" "https://source.puri.sm/api/v4/projects/$ISO_REPO_ID/pipelines/$ID/variables" | jq -r ".[] | select(.key == \"LIBREMEC_PIPELINE_ID\") | .value")
+
+    if [[ $ROM_PIPELINE_ID == $LIBREMEC_PIPELINE_ID ]]; then
+        ISO_JOB_ID=$(echo $JOB | jq -r '.id')
+        break
+    fi
+done
+
+if [[ -z $ISO_JOB_ID ]]; then
+    echo "Error: Didn't found ISO job triggered by EC job."
+    exit 1
+fi
+
 
 echo "Creating new branches..."
 
@@ -72,35 +120,31 @@ RELEASES_RC_COMMITS="$(checkout_release_branch ../releases "$RELEASE_BRANCH")"
 
 
 RC_NUM="$(("$RELEASES_RC_COMMITS" + 1))"
-echo "Building $RELEASE_BRANCH/RC$RC_NUM..."
+echo "Downloading $RELEASE_BRANCH/RC$RC_NUM..."
 
 DATE=$(git show --format="%cd" --date="format:%Y-%m-%d" --no-patch)
 VERSION="${TAG}_${DATE}"
 
-for board in "${boards[@]}"
-do
-	filename="ec-${VERSION}.rom"
-	filepath="build/purism/${board}/${VERSION}/"
-	rm "${filepath}${filename}" 2>/dev/null || true
+filename="ec-${VERSION}.rom"
 
-	# build board
-	while ! make BOARD="purism/${board}"
-	do
-		read -rp "Build failed - retry?" retry
-		if [[ "$retry" != "Y" && "$retry" != "y" ]] ; then
-			die "user aborted"
-		fi
-	done
+# Download build artifact
+curl -s -L --output "$filename" \
+--header "PRIVATE-TOKEN: $(cat .release-api-key)" \
+"https://source.puri.sm/api/v4/projects/$ROM_REPO_ID/jobs/artifacts/test-build/raw/Librem_14_EC/$filename?job=build"
 
-	# compress
-	gzip -k "${filepath}${filename}"
+curl -s -L --output "Librem_14_EC_Update.iso" \
+--header "PRIVATE-TOKEN: $(cat .release-api-key)" \
+"https://source.puri.sm/api/v4/projects/$ISO_REPO_ID/jobs/artifacts/test-build/raw/livework/Librem_14_EC_Update.iso?job=build"
 
-	# update in releases repo
-	mkdir -p "../releases/${board}/" 2>/dev/null || true
-	rm "../releases/${board}/ec-"* 2>/dev/null || true
-	mv "${filepath}${filename}.gz" "../releases/${board}/"
+# compress
+gzip -k "${filename}"
 
-done
+# update in releases repo
+mkdir -p "../releases/librem_14/" 2>/dev/null || true
+rm "../releases/librem_14/ec-"* 2>/dev/null || true
+mv "${filename}.gz" "../releases/librem_14/"
+
+mv "Librem_14_EC_Update.iso" "../releases/librem_14"
 
 # Prepare commit message template
 COMMITMSG_TMP="$SCRATCHDIR/commitmsg"
@@ -135,15 +179,6 @@ pause "Ready to push $RELEASE_BRANCH/RC$RC_NUM, press enter to continue"
 # Push everything last
 if ! git -C ../releases push origin "$RELEASE_BRANCH" >/dev/null 2>&1; then
 	echo -e "\nError pushing releases branch $TAG\n"
-fi
-
-# push branch, tag itself
-BRANCH=$(git rev-parse --abbrev-ref HEAD)
-if ! git push -f origin "$BRANCH" >/dev/null; then
-	echo -e "\nError pushing branch $BRANCH\n"
-fi
-if ! git push origin "$TAG" -f >/dev/null; then
-	echo -e "\nError pushing Librem-EC tag $TAG\n"
 fi
 
 echo -e "\Librem-EC release builds successfully built and branches added\n"
