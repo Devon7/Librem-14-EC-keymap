@@ -62,7 +62,7 @@ if [ -z "$(git tag -l "$TAG" --points-at HEAD)" ]; then
 	exit 1
 fi
 
-ROM_REPO_ID=2649
+ROM_REPO_ID=1796
 TAG_COMMIT=$(git rev-list -n 1 $TAG)
 ROM_JOB=$(curl -s --header "PRIVATE-TOKEN: $(cat .release-api-key)" "https://source.puri.sm/api/v4/projects/$ROM_REPO_ID/jobs" | jq ".[] | select(.tag == true) | select(.ref == \"$TAG\")" | jq -s '.[0]')
 ROM_JOB_COMMIT=$(echo $ROM_JOB | jq -r ".commit.id")
@@ -75,7 +75,7 @@ if [[ "$ROM_JOB_COMMIT" != "$TAG_COMMIT" ]]; then
     exit 1
 fi
 
-ISO_REPO_ID=3038
+ISO_REPO_ID=2151
 ISO_JOB_LIST=$(curl -s --header "PRIVATE-TOKEN: $(cat .release-api-key)" "https://source.puri.sm/api/v4/projects/$ISO_REPO_ID/jobs" | jq -ac '.[] | {id:.id, pipeline:{id:.pipeline.id}}')
 ISO_JOB_ID="" # 
 for JOB in $ISO_JOB_LIST
