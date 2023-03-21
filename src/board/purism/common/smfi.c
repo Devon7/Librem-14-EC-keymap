@@ -19,6 +19,7 @@
 
 #ifndef __SCRATCH__
     #include <board/scratch.h>
+    #include <board/jack_detect.h>
     #include <board/kbled.h>
     #include <board/kbscan.h>
 #endif
@@ -26,6 +27,7 @@
 #include <common/command.h>
 #include <common/macro.h>
 #include <common/version.h>
+#include <common/debug.h>
 #include <ec/etwd.h>
 #include <ec/pwm.h>
 
@@ -243,6 +245,7 @@ static enum Result cmd_matrix_get(void) {
     }
     return RES_OK;
 }
+
 #endif // !defined(__SCRATCH__)
 
 #if defined(__SCRATCH__)
@@ -327,7 +330,14 @@ void smfi_event(void) {
                 smfi_cmd[SMFI_CMD_DATA + 1] = 0xEC;
                 // Version
                 smfi_cmd[SMFI_CMD_DATA + 2] = 0x01;
-                //TODO: bitmask of implemented commands?
+                // Flags:
+                smfi_cmd[SMFI_CMD_DATA + 3] = 0x00;
+#if defined(HAVE_JACK_DETECT)
+                // Bit 0: Has headphone jack detect.  For boards where EC
+                //   participates in jack detect, indicates to coreboot that it
+                //   can use verbs with jack detect.
+                smfi_cmd[SMFI_CMD_DATA + 3] |= 0x01;
+#endif
                 // Always successful
                 smfi_cmd[SMFI_CMD_RES] = RES_OK;
                 break;

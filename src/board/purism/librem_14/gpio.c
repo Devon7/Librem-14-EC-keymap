@@ -45,7 +45,6 @@ struct Gpio __code POWER_ETH_ON =		GPIO(C, 6);	// power supply for Gbit ethernet
 struct Gpio __code KBD_BACKLIGHT_EN =	GPIO(A, 6);
 struct Gpio __code CHG_CELL_CFG =		GPIO(J, 1);
 struct Gpio __code BAT_CELL_SEL =		GPIO(J, 3);
-struct Gpio __code HEADPHONE_DET =		GPIO(I, 6);
 struct Gpio __code MIC_SELECT =			GPIO(F, 0);
 struct Gpio __code EC_MUTE_N =			GPIO(E, 3);
 
@@ -112,9 +111,11 @@ void gpio_init() {
     GPCRE5 = GPIO_OUT;		// ROP_SYS_PWROK, SYS_PWROK on main CPU
     GPCRE6 = GPIO_IN;		// PM_SUS_STAT#
     GPCRE7 = GPIO_OUT;		// PM_BATLOW#
-    
+
     // GPIO port F
     GPDRF = (1 << 5);
+
+    GPOTF = 1;  // Open drain on MIC_SPDIF_SEL
 
     GPCRF0 = GPIO_OUT;		// audio codec SPDIF0/GPIO2 -> toggle for headphone mic input
     GPCRF1 = GPIO_OUT;		// +V0.95A_EN
@@ -124,13 +125,13 @@ void gpio_init() {
     GPCRF5 = GPIO_OUT;		// A_POWER_OK -> DSW_PWROK
     GPCRF6 = GPIO_ALT;		// H_PECI_EC
     GPCRF7 = GPIO_IN;		// NA
-    
+
     // GPIO port G
     GPDRG = 0x00;
 
     GPCRG1 = GPIO_IN;		// PCH_PWROK_EC
     GPCRG6 = GPIO_OUT;		// V1.05A_EN
-    
+
     // GPIO port H
     GPDRH = (1 << 4) | (1 << 3);
 
@@ -142,7 +143,7 @@ void gpio_init() {
     GPCRH5 = GPIO_IN;		// TYPE_EC_IRQ -> type-C ALERT#
     GPCRH6 = GPIO_IN;		// LCD lid open/close switch
     GPCRH7 = GPIO_IN;		// NA
-    
+
     // GPIO port I
     GPDRI = (1U << 7);
 
@@ -152,9 +153,9 @@ void gpio_init() {
     GPCRI3 = GPIO_IN;		// PM_SLP_S4#
     GPCRI4 = GPIO_IN;		// PM_SLP_S3#
     GPCRI5 = GPIO_IN;		// ADP_IN#, DC adapter (charger) present
-    GPCRI6 = GPIO_IN;		// 3.5mm jack headphone detect
+    GPCRI6 = GPIO_ALT;		// 3.5mm jack headphone detect, analog sense
     GPCRI7 = GPIO_OUT;		// type-C USB port 5V power enable
-    
+
     // GPIO port J
     GPDRJ = (1 << 3) | (1 << 4) | (1 << 5); // LEDs have negative logic, turn off
 
