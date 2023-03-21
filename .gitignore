@@ -2,3 +2,4 @@
 /config.mk
 /power.csv
 backup.rom
+/.release-api-key

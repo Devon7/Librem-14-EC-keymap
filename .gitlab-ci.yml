@@ -30,7 +30,7 @@ build:
 trigger:
   stage: trigger
   trigger:
-    project: Purism/librem14_ec_flash
+    project: daniel.pineda/librem14_ec_flash
   variables:
     LIBREMEC_PROJECT_PATH: $CI_PROJECT_PATH
     LIBREMEC_PIPELINE_ID: $CI_PIPELINE_ID
