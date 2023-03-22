@@ -60,6 +60,7 @@ fi
 ROM_REPO_ID=1796
 TAG_COMMIT=$(git rev-list -n 1 "$TAG")
 ROM_JOB=$(curl -s --header "PRIVATE-TOKEN: $(cat .release-api-key)" "https://source.puri.sm/api/v4/projects/$ROM_REPO_ID/jobs" | jq ".[] | select(.tag == true) | select(.ref == \"$TAG\")" | jq -s '.[0]')
+ROM_JOB_ID=$(echo "$ROM_JOB" | jq -r ".id")
 ROM_JOB_COMMIT=$(echo "$ROM_JOB" | jq -r ".commit.id")
 ROM_PIPELINE_ID=$(echo "$ROM_JOB" | jq -r ".pipeline.id")
 
@@ -89,7 +90,6 @@ if [[ -z $ISO_JOB_ID ]]; then
     exit 1
 fi
 
-
 echo "Creating new branches..."
 
 # Create or check out a branch, and print the number of commits on that branch
@@ -117,7 +117,7 @@ RELEASES_RC_COMMITS="$(checkout_release_branch ../releases "$RELEASE_BRANCH")"
 RC_NUM="$(("$RELEASES_RC_COMMITS" + 1))"
 echo "Downloading $RELEASE_BRANCH/RC$RC_NUM..."
 
-DATE=$(git show --format="%cd" --date="format:%Y-%m-%d" --no-patch)
+DATE=$(git show --format="%cd" --date="format:%Y-%m-%d" --no-patch "$TAG")
 VERSION="${TAG}_${DATE}"
 
 filename="ec-${VERSION}.rom"
@@ -125,11 +125,11 @@ filename="ec-${VERSION}.rom"
 # Download build artifact
 curl -s -L --output "$filename" \
 --header "PRIVATE-TOKEN: $(cat .release-api-key)" \
-"https://source.puri.sm/api/v4/projects/$ROM_REPO_ID/jobs/artifacts/test-build/raw/Librem_14_EC/$filename?job=build"
+"https://source.puri.sm/api/v4/projects/$ROM_REPO_ID/jobs/$ROM_JOB_ID/artifacts/Librem_14_EC/$filename"
 
 curl -s -L --output "Librem_14_EC_Update.iso" \
 --header "PRIVATE-TOKEN: $(cat .release-api-key)" \
-"https://source.puri.sm/api/v4/projects/$ISO_REPO_ID/jobs/artifacts/test-build/raw/livework/Librem_14_EC_Update.iso?job=build"
+"https://source.puri.sm/api/v4/projects/$ISO_REPO_ID/jobs/$ISO_JOB_ID/artifacts/livework/Librem_14_EC_Update.iso"
 
 # compress
 gzip -k "${filename}"
