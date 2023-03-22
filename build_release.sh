@@ -38,11 +38,6 @@ if [[ -z "$APIKEY" ]]; then
     exit 1
 fi
 
-
-
-# boards to build
-boards=("librem_14")
-
 # check release tags
 TAG=$(git describe --tags --dirty)
 if [[ "$TAG" == *"dirty"* ]]; then
@@ -63,10 +58,10 @@ if [ -z "$(git tag -l "$TAG" --points-at HEAD)" ]; then
 fi
 
 ROM_REPO_ID=1796
-TAG_COMMIT=$(git rev-list -n 1 $TAG)
+TAG_COMMIT=$(git rev-list -n 1 "$TAG")
 ROM_JOB=$(curl -s --header "PRIVATE-TOKEN: $(cat .release-api-key)" "https://source.puri.sm/api/v4/projects/$ROM_REPO_ID/jobs" | jq ".[] | select(.tag == true) | select(.ref == \"$TAG\")" | jq -s '.[0]')
-ROM_JOB_COMMIT=$(echo $ROM_JOB | jq -r ".commit.id")
-ROM_PIPELINE_ID=$(echo $ROM_JOB | jq -r ".pipeline.id")
+ROM_JOB_COMMIT=$(echo "$ROM_JOB" | jq -r ".commit.id")
+ROM_PIPELINE_ID=$(echo "$ROM_JOB" | jq -r ".pipeline.id")
 
 if [[ "$ROM_JOB_COMMIT" != "$TAG_COMMIT" ]]; then
     echo "Latest tag job commit doesn't match commit pointed by tag."
@@ -77,14 +72,14 @@ fi
 
 ISO_REPO_ID=2151
 ISO_JOB_LIST=$(curl -s --header "PRIVATE-TOKEN: $(cat .release-api-key)" "https://source.puri.sm/api/v4/projects/$ISO_REPO_ID/jobs" | jq -ac '.[] | {id:.id, pipeline:{id:.pipeline.id}}')
-ISO_JOB_ID="" # 
+ISO_JOB_ID="" #
 for JOB in $ISO_JOB_LIST
 do
-    ID=$(echo $JOB | jq -r '.pipeline.id')
+    ID=$(echo "$JOB" | jq -r '.pipeline.id')
     LIBREMEC_PIPELINE_ID=$(curl -s --header "PRIVATE-TOKEN: $(cat .release-api-key)" "https://source.puri.sm/api/v4/projects/$ISO_REPO_ID/pipelines/$ID/variables" | jq -r ".[] | select(.key == \"LIBREMEC_PIPELINE_ID\") | .value")
 
-    if [[ $ROM_PIPELINE_ID == $LIBREMEC_PIPELINE_ID ]]; then
-        ISO_JOB_ID=$(echo $JOB | jq -r '.id')
+    if [[ "$ROM_PIPELINE_ID" == "$LIBREMEC_PIPELINE_ID" ]]; then
+        ISO_JOB_ID=$(echo "$JOB" | jq -r '.id')
         break
     fi
 done
