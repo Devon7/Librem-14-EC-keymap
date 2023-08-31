@@ -49,11 +49,21 @@
 }
 
 // Position of physical Esc key in the matrix
+// ../../keymap/devon.c K_ESC = K110 = column 4 row 10
+// ../../keymap/default.c K_ESC = K110 = column 4 row 10
 #define MATRIX_ESC_INPUT    4
 #define MATRIX_ESC_OUTPUT   10
 
 // Position of physical Fn key in the matrix
+#ifdef DEVON
+// ../../keymap/devon.c KT_FN = LCTRL_FN = K58 = column 1 row 3
+#define MATRIX_FN_INPUT     1
+#define MATRIX_FN_OUTPUT    3
+#else // DEVON
+// ../../keymap/devon.c KT_FN = FN_LCTRL = K59 = column 2 row 13
+// ../../keymap/default.c KT_FN = K59 = column 2 row 13
 #define MATRIX_FN_INPUT     2
 #define MATRIX_FN_OUTPUT    13
+#endif // DEVON
 
 #endif // _BOARD_KEYMAP_H

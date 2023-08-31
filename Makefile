@@ -32,6 +32,9 @@ INCLUDE=$(wildcard $(COMMON_DIR)/include/common/*.h) $(COMMON_DIR)/common.mk
 CFLAGS=-I$(COMMON_DIR)/include -D__FIRMWARE_VERSION__=$(VERSION)
 include $(COMMON_DIR)/common.mk
 
+# Just a minute here - let the builder speak!
+CFLAGS+=$(EXTRA_CFLAGS)
+
 # Include the board's source
 BOARD_DIR=src/board/$(BOARD)
 SRC+=$(wildcard $(BOARD_DIR)/*.c)
